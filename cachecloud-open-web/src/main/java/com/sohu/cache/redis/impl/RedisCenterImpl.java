@@ -29,7 +29,6 @@ import com.sohu.cache.machine.MachineCenter;
 import com.sohu.cache.protocol.RedisProtocol;
 import com.sohu.cache.redis.RedisCenter;
 import com.sohu.cache.redis.enums.RedisInfoEnum;
-import com.sohu.cache.redis.enums.RedisReadOnlyCommandEnum;
 import com.sohu.cache.schedule.SchedulerCenter;
 import com.sohu.cache.stats.instance.InstanceStatsCenter;
 import com.sohu.cache.util.ConstUtils;
@@ -373,8 +372,8 @@ public class RedisCenterImpl implements RedisCenter {
             return infoMap;
         }
         // cluster info统计
-        Map<String,Object> clusterInfoMap = getClusterInfoStats(appId, instanceInfo);
-        
+        Map<String, Object> clusterInfoMap = getClusterInfoStats(appId, instanceInfo);
+
         boolean isOk = asyncService.submitFuture(new RedisKeyCallable(appId, collectTime, host, port, infoMap, clusterInfoMap));
         if (!isOk) {
             logger.error("submitFuture failed,appId:{},collectTime:{},host:{},port:{} cost={} ms",
@@ -395,7 +394,7 @@ public class RedisCenterImpl implements RedisCenter {
                 public boolean execute() {
                     Jedis jedis = null;
                     try {
-                    	    jedis = getJedis(appId, host, port);
+                        jedis = getJedis(appId, host, port);
                         jedis.getClient().setConnectionTimeout(REDIS_DEFAULT_TIME * (timeOutFactor++));
                         jedis.getClient().setSoTimeout(REDIS_DEFAULT_TIME * (timeOutFactor++));
                         String info = jedis.info("all");
@@ -423,13 +422,13 @@ public class RedisCenterImpl implements RedisCenter {
         }
         return infoMap;
     }
-    
+
     @Override
     public Map<String, Object> getClusterInfoStats(final long appId, final String host, final int port) {
         InstanceInfo instanceInfo = instanceDao.getAllInstByIpAndPort(host, port);
         return getClusterInfoStats(appId, instanceInfo);
     }
-    
+
     @Override
     public Map<String, Object> getClusterInfoStats(final long appId, final InstanceInfo instanceInfo) {
         long startTime = System.currentTimeMillis();
@@ -678,9 +677,10 @@ public class RedisCenterImpl implements RedisCenter {
         }
         return list;
     }
-    
+
     /**
      * 处理clusterinfo统计信息
+     *
      * @param clusterInfo
      * @return
      */
@@ -729,7 +729,7 @@ public class RedisCenterImpl implements RedisCenter {
         }
         return redisStatMap;
     }
-    
+
     /**
      * 根据infoMap的结果判断实例的主从
      *
@@ -789,9 +789,10 @@ public class RedisCenterImpl implements RedisCenter {
             jedis.close();
         }
     }
-    
+
     /**
      * 根据ip和port判断redis实例当前是否有从节点
+     *
      * @param ip   ip
      * @param port port
      * @return 主返回true，从返回false；
@@ -808,7 +809,7 @@ public class RedisCenterImpl implements RedisCenter {
         } finally {
             jedis.close();
         }
-    }   
+    }
 
     @Override
     public HostAndPort getMaster(String ip, int port, String password) {
@@ -836,28 +837,28 @@ public class RedisCenterImpl implements RedisCenter {
                 jedis.close();
         }
     }
-    
+
     @Override
-	public boolean isRun(final String ip, final int port) {
-    		return isRun(ip, port, null);
+    public boolean isRun(final String ip, final int port) {
+        return isRun(ip, port, null);
     }
 
     @Override
     public boolean isRun(final long appId, final String ip, final int port) {
-    		AppDesc appDesc = appDao.getAppDescById(appId);
-    		return isRun(ip, port, appDesc.getPassword());
+        AppDesc appDesc = appDao.getAppDescById(appId);
+        return isRun(ip, port, appDesc.getPassword());
     }
-    
+
     @Override
-	public boolean isRun(final String ip, final int port, final String password) {
-   		boolean isRun = new IdempotentConfirmer() {
+    public boolean isRun(final String ip, final int port, final String password) {
+        boolean isRun = new IdempotentConfirmer() {
             private int timeOutFactor = 1;
 
             @Override
             public boolean execute() {
                 Jedis jedis = null;
                 try {
-                		jedis = getJedis(ip, port, password);
+                    jedis = getJedis(ip, port, password);
                     jedis.getClient().setConnectionTimeout(Protocol.DEFAULT_TIMEOUT * (timeOutFactor++));
                     jedis.getClient().setSoTimeout(Protocol.DEFAULT_TIMEOUT * (timeOutFactor++));
                     String pong = jedis.ping();
@@ -873,15 +874,15 @@ public class RedisCenterImpl implements RedisCenter {
                     logger.warn("{}:{} error message is {} ", ip, port, e.getMessage());
                     return false;
                 } finally {
-                		if (jedis != null) {
-                			jedis.close();
-					}
+                    if (jedis != null) {
+                        jedis.close();
+                    }
                 }
             }
         }.run();
         return isRun;
-	}
-    
+    }
+
 
     @Override
     public boolean shutdown(long appId, String ip, int port) {
@@ -907,10 +908,10 @@ public class RedisCenterImpl implements RedisCenter {
             jedis.close();
         }
     }
-    
+
     @Override
-	public boolean shutdown(String ip, int port) {
-    		boolean isRun = isRun(ip, port);
+    public boolean shutdown(String ip, int port) {
+        boolean isRun = isRun(ip, port);
         if (!isRun) {
             return true;
         }
@@ -931,7 +932,7 @@ public class RedisCenterImpl implements RedisCenter {
         } finally {
             jedis.close();
         }
-	}
+    }
 
     /**
      * 返回当前实例的一些关键指标
@@ -1023,11 +1024,6 @@ public class RedisCenterImpl implements RedisCenter {
     @Override
     public String executeCommand(AppDesc appDesc, String command) {
         //非测试应用只能执行白名单里面的命令
-        if (AppDescEnum.AppTest.NOT_TEST.getValue() == appDesc.getIsTest()) {
-            if (!RedisReadOnlyCommandEnum.contains(command)) {
-                return "online app only support read-only and safe command";
-            }
-        }
         int type = appDesc.getType();
         long appId = appDesc.getAppId();
         String password = appDesc.getPassword();
@@ -1041,8 +1037,7 @@ public class RedisCenterImpl implements RedisCenter {
                 jedis = jedisSentinelPool.getResource();
                 String host = jedis.getClient().getHost();
                 int port = jedis.getClient().getPort();
-                return String.valueOf(jedis.eval(command));
-//                return executeCommand(appId, host, port, command);
+                return executeCommand(appId, host, port, command);
             } catch (Exception e) {
                 logger.error(e.getMessage(), e);
                 return "运行出错:" + e.getMessage();
@@ -1095,13 +1090,14 @@ public class RedisCenterImpl implements RedisCenter {
                     }
                 }
             }
-            
+
         }
         return "不支持应用类型";
     }
-    
+
     /**
      * 获取key对应的节点
+     *
      * @param host
      * @param port
      * @param password
@@ -1145,11 +1141,11 @@ public class RedisCenterImpl implements RedisCenter {
             return "not exist appId";
         }
         //非测试应用只能执行白名单里面的命令
-        if (AppDescEnum.AppTest.NOT_TEST.getValue() == appDesc.getIsTest()) {
-            if (!RedisReadOnlyCommandEnum.contains(command)) {
-                return "online app only support read-only and safe command ";
-            }
-        }
+//        if (AppDescEnum.AppTest.NOT_TEST.getValue() == appDesc.getIsTest()) {
+//            if (!RedisReadOnlyCommandEnum.contains(command)) {
+//                return "online app only support read-only and safe command ";
+//            }
+//        }
         String password = appDesc.getPassword();
         String shell = RedisProtocol.getExecuteCommandShell(host, port, password, command);
         //记录客户端发送日志
@@ -1201,7 +1197,7 @@ public class RedisCenterImpl implements RedisCenter {
         if (TypeUtil.isRedisType(instanceInfo.getType())) {
             Jedis jedis = null;
             try {
-            		jedis = getJedis(instanceInfo.getAppId(), instanceInfo.getIp(), instanceInfo.getPort(), REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
+                jedis = getJedis(instanceInfo.getAppId(), instanceInfo.getIp(), instanceInfo.getPort(), REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
                 List<String> configs = jedis.configGet("*");
                 Map<String, String> configMap = new LinkedHashMap<String, String>();
                 for (int i = 0; i < configs.size(); i += 2) {
@@ -1246,7 +1242,7 @@ public class RedisCenterImpl implements RedisCenter {
     private List<RedisSlowLog> getRedisSlowLogs(long appId, String host, int port, int maxCount) {
         Jedis jedis = null;
         try {
-        		jedis = getJedis(appId, host, port, REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
+            jedis = getJedis(appId, host, port, REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
             List<RedisSlowLog> resultList = new ArrayList<RedisSlowLog>();
             List<Slowlog> slowlogs = null;
             if (maxCount > 0) {
@@ -1330,9 +1326,9 @@ public class RedisCenterImpl implements RedisCenter {
             // master + 非sentinel节点
             Boolean isMater = isMaster(appId, host, port);
             if (isMater != null && isMater.equals(true) && !TypeUtil.isRedisSentinel(instance.getType())) {
-            		Jedis jedis = getJedis(appId, host, port);
-            		jedis.getClient().setConnectionTimeout(REDIS_DEFAULT_TIME);
-            		jedis.getClient().setSoTimeout(60000);
+                Jedis jedis = getJedis(appId, host, port);
+                jedis.getClient().setConnectionTimeout(REDIS_DEFAULT_TIME);
+                jedis.getClient().setSoTimeout(60000);
                 try {
                     logger.warn("{}:{} start clear data", host, port);
                     long start = System.currentTimeMillis();
@@ -1388,7 +1384,7 @@ public class RedisCenterImpl implements RedisCenter {
         if (TypeUtil.isRedisType(instanceInfo.getType())) {
             Jedis jedis = null;
             try {
-            		jedis = getJedis(instanceInfo.getAppId(), instanceInfo.getIp(), instanceInfo.getPort(), REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
+                jedis = getJedis(instanceInfo.getAppId(), instanceInfo.getIp(), instanceInfo.getPort(), REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
                 jedis.clientList();
                 List<String> resultList = new ArrayList<String>();
                 String clientList = jedis.clientList();
@@ -1651,7 +1647,7 @@ public class RedisCenterImpl implements RedisCenter {
         List<Integer> clusterLossSlots = new ArrayList<Integer>();
         Jedis jedis = null;
         try {
-        		jedis = getJedis(appId, healthHost, healthPort, REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
+            jedis = getJedis(appId, healthHost, healthPort, REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
             String clusterNodes = jedis.clusterNodes();
             if (StringUtils.isBlank(clusterNodes)) {
                 throw new RuntimeException(healthHost + ":" + healthPort + "clusterNodes is null");
@@ -1754,48 +1750,48 @@ public class RedisCenterImpl implements RedisCenter {
 
     @Override
     public Map<String, InstanceSlotModel> getClusterSlotsMap(long appId) {
-    		AppDesc appDesc = appDao.getAppDescById(appId);
-    		if (!TypeUtil.isRedisCluster(appDesc.getType())) {
-    			return Collections.emptyMap();
-    		}
-		// 最终结果
-		Map<String, InstanceSlotModel> resultMap = new HashMap<String, InstanceSlotModel>();
+        AppDesc appDesc = appDao.getAppDescById(appId);
+        if (!TypeUtil.isRedisCluster(appDesc.getType())) {
+            return Collections.emptyMap();
+        }
+        // 最终结果
+        Map<String, InstanceSlotModel> resultMap = new HashMap<String, InstanceSlotModel>();
 
-		// 找到一个运行的节点用来执行cluster slots
-		List<InstanceInfo> instanceList = instanceDao.getInstListByAppId(appId);
-		String host = null;
-		int port = 0;
-		for (InstanceInfo instanceInfo : instanceList) {
-			if (instanceInfo.isOffline()) {
-				continue;
-			}
-			host = instanceInfo.getIp();
-			port = instanceInfo.getPort();
-			boolean isRun = isRun(appId, host, port);
-			if (isRun) {
-				break;
-			}
-		}
-		if (StringUtils.isBlank(host) || port <= 0) {
-			return Collections.emptyMap();
-		}
+        // 找到一个运行的节点用来执行cluster slots
+        List<InstanceInfo> instanceList = instanceDao.getInstListByAppId(appId);
+        String host = null;
+        int port = 0;
+        for (InstanceInfo instanceInfo : instanceList) {
+            if (instanceInfo.isOffline()) {
+                continue;
+            }
+            host = instanceInfo.getIp();
+            port = instanceInfo.getPort();
+            boolean isRun = isRun(appId, host, port);
+            if (isRun) {
+                break;
+            }
+        }
+        if (StringUtils.isBlank(host) || port <= 0) {
+            return Collections.emptyMap();
+        }
 
-		// 获取cluster slots
-		List<Object> clusterSlotList = null;
-		Jedis jedis = null;
-		try {
-			jedis = getJedis(appId, host, port);
-			clusterSlotList = jedis.clusterSlots();
-		} catch (Exception e) {
-			logger.error(e.getMessage(), e);
-		} finally {
-			if (jedis != null)
-				jedis.close();
-		}
-		if (clusterSlotList == null || clusterSlotList.size() == 0) {
-			return Collections.emptyMap();
-		}
-		//clusterSlotList形如：
+        // 获取cluster slots
+        List<Object> clusterSlotList = null;
+        Jedis jedis = null;
+        try {
+            jedis = getJedis(appId, host, port);
+            clusterSlotList = jedis.clusterSlots();
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+        } finally {
+            if (jedis != null)
+                jedis.close();
+        }
+        if (clusterSlotList == null || clusterSlotList.size() == 0) {
+            return Collections.emptyMap();
+        }
+        //clusterSlotList形如：
 //		[0, 1, [[B@5caf905d, 6380], [[B@27716f4, 6379]]
 //		[3, 4096, [[B@8efb846, 6380], [[B@2a84aee7, 6379]]
 //		[12291, 16383, [[B@a09ee92, 6383], [[B@30f39991, 6382]]
@@ -1803,86 +1799,88 @@ public class RedisCenterImpl implements RedisCenter {
 //		[8194, 12290, [[B@f6f4d33, 6381], [[B@23fc625e, 6382]]
 //		[4097, 8193, [[B@3f99bd52, 6380], [[B@4f023edb, 6381]]
 
-		for (Object clusterSlotObj : clusterSlotList) {
-			List<Object> slotInfoList = (List<Object>) clusterSlotObj;
-			if (slotInfoList.size() <= 2) {
-				continue;
-			}
-			//获取slot的start到end相关
-			int startSlot = ((Long) slotInfoList.get(0)).intValue();
-			int endSlot = ((Long) slotInfoList.get(1)).intValue();
-			String slotDistribute = getStartToEndSlotDistribute(startSlot, endSlot);
-			List<Integer> slotList = getStartToEndSlotList(startSlot, endSlot);
+        for (Object clusterSlotObj : clusterSlotList) {
+            List<Object> slotInfoList = (List<Object>) clusterSlotObj;
+            if (slotInfoList.size() <= 2) {
+                continue;
+            }
+            //获取slot的start到end相关
+            int startSlot = ((Long) slotInfoList.get(0)).intValue();
+            int endSlot = ((Long) slotInfoList.get(1)).intValue();
+            String slotDistribute = getStartToEndSlotDistribute(startSlot, endSlot);
+            List<Integer> slotList = getStartToEndSlotList(startSlot, endSlot);
 
-			List<Object> masterInfoList = (List<Object>) slotInfoList.get(2);
-			String tempHost = SafeEncoder.encode((byte[]) masterInfoList.get(0));
-			int tempPort = ((Long) masterInfoList.get(1)).intValue();
-			String hostPort = tempHost + ":" + tempPort;
-			if (resultMap.containsKey(hostPort)) {
-				InstanceSlotModel instanceSlotModel = resultMap.get(hostPort);
-				instanceSlotModel.getSlotDistributeList().add(slotDistribute);
-				instanceSlotModel.getSlotList().addAll(slotList);
-			} else {
-				InstanceSlotModel instanceSlotModel = new InstanceSlotModel();
-				instanceSlotModel.setHost(tempHost);
-				instanceSlotModel.setPort(tempPort);
-				List<String> slotDistributeList = new ArrayList<String>();
-				slotDistributeList.add(slotDistribute);
-				instanceSlotModel.setSlotDistributeList(slotDistributeList);
-				instanceSlotModel.setSlotList(slotList);
-				resultMap.put(hostPort, instanceSlotModel);
-			}
-		}
-		return resultMap;
-	}
+            List<Object> masterInfoList = (List<Object>) slotInfoList.get(2);
+            String tempHost = SafeEncoder.encode((byte[]) masterInfoList.get(0));
+            int tempPort = ((Long) masterInfoList.get(1)).intValue();
+            String hostPort = tempHost + ":" + tempPort;
+            if (resultMap.containsKey(hostPort)) {
+                InstanceSlotModel instanceSlotModel = resultMap.get(hostPort);
+                instanceSlotModel.getSlotDistributeList().add(slotDistribute);
+                instanceSlotModel.getSlotList().addAll(slotList);
+            } else {
+                InstanceSlotModel instanceSlotModel = new InstanceSlotModel();
+                instanceSlotModel.setHost(tempHost);
+                instanceSlotModel.setPort(tempPort);
+                List<String> slotDistributeList = new ArrayList<String>();
+                slotDistributeList.add(slotDistribute);
+                instanceSlotModel.setSlotDistributeList(slotDistributeList);
+                instanceSlotModel.setSlotList(slotList);
+                resultMap.put(hostPort, instanceSlotModel);
+            }
+        }
+        return resultMap;
+    }
 
-	/**
-	 * 获取slot列表
-	 * @param startSlot
-	 * @param endSlot
-	 * @return
-	 */
-	private List<Integer> getStartToEndSlotList(int startSlot, int endSlot) {
-		List<Integer> slotList = new ArrayList<Integer>();
-		if (startSlot == endSlot) {
-			slotList.add(startSlot);
-		} else {
-			for (int i = startSlot; i <= endSlot; i++) {
-				slotList.add(i);
-			}
-		}
-		return slotList;
-	}
+    /**
+     * 获取slot列表
+     *
+     * @param startSlot
+     * @param endSlot
+     * @return
+     */
+    private List<Integer> getStartToEndSlotList(int startSlot, int endSlot) {
+        List<Integer> slotList = new ArrayList<Integer>();
+        if (startSlot == endSlot) {
+            slotList.add(startSlot);
+        } else {
+            for (int i = startSlot; i <= endSlot; i++) {
+                slotList.add(i);
+            }
+        }
+        return slotList;
+    }
 
-	/**
+    /**
      * 0,4096 0-4096
      * 2,2 2-2
+     *
      * @param slotInfo
      * @return
      */
-	private String getStartToEndSlotDistribute(int startSlot, int endSlot) {
-		if (startSlot == endSlot) {
-			return String.valueOf(startSlot);
-		} else {
-			return startSlot + "-" + endSlot;
-		}
+    private String getStartToEndSlotDistribute(int startSlot, int endSlot) {
+        if (startSlot == endSlot) {
+            return String.valueOf(startSlot);
+        } else {
+            return startSlot + "-" + endSlot;
+        }
     }
-	
-	@Override
+
+    @Override
     public String getRedisVersion(long appId, String ip, int port) {
-	    Map<RedisConstant, Map<String, Object>> infoAllMap = getInfoStats(appId, ip, port);
-	    if (MapUtils.isEmpty(infoAllMap)) {
-	        return null;
-	    }
-	    Map<String, Object> serverMap = infoAllMap.get(RedisConstant.Server);
-	    if (MapUtils.isEmpty(serverMap)) {
+        Map<RedisConstant, Map<String, Object>> infoAllMap = getInfoStats(appId, ip, port);
+        if (MapUtils.isEmpty(infoAllMap)) {
             return null;
         }
-	    return MapUtils.getString(serverMap, "redis_version");
+        Map<String, Object> serverMap = infoAllMap.get(RedisConstant.Server);
+        if (MapUtils.isEmpty(serverMap)) {
+            return null;
+        }
+        return MapUtils.getString(serverMap, "redis_version");
     }
-	
-	@Override
-	public String getNodeId(long appId, String ip, int port) {
+
+    @Override
+    public String getNodeId(long appId, String ip, int port) {
         final Jedis jedis = getJedis(appId, ip, port);
         try {
             final StringBuilder clusterNodes = new StringBuilder();
@@ -1915,7 +1913,7 @@ public class RedisCenterImpl implements RedisCenter {
         }
         return null;
     }
-	
+
     public void setSchedulerCenter(SchedulerCenter schedulerCenter) {
         this.schedulerCenter = schedulerCenter;
     }
@@ -1955,43 +1953,40 @@ public class RedisCenterImpl implements RedisCenter {
     public void setInstanceSlowLogDao(InstanceSlowLogDao instanceSlowLogDao) {
         this.instanceSlowLogDao = instanceSlowLogDao;
     }
-    
+
     @Override
-	public Jedis getJedis(long appId, String host, int port) {
-		return getJedis(appId, host, port, Protocol.DEFAULT_TIMEOUT, Protocol.DEFAULT_TIMEOUT);
-	}
+    public Jedis getJedis(long appId, String host, int port) {
+        return getJedis(appId, host, port, Protocol.DEFAULT_TIMEOUT, Protocol.DEFAULT_TIMEOUT);
+    }
 
-	@Override
-	public Jedis getJedis(long appId, String host, int port, int connectionTimeout, int soTimeout) {
-		AppDesc appDesc = appDao.getAppDescById(appId);
-		String password = appDesc.getPassword();
-		Jedis jedis = new Jedis(host, port);
-		jedis.getClient().setConnectionTimeout(connectionTimeout);
-		jedis.getClient().setSoTimeout(soTimeout);
-		if (StringUtils.isNotBlank(password)) {
-			jedis.auth(password);
-		}
-		return jedis;
-	}
+    @Override
+    public Jedis getJedis(long appId, String host, int port, int connectionTimeout, int soTimeout) {
+        AppDesc appDesc = appDao.getAppDescById(appId);
+        String password = appDesc.getPassword();
+        Jedis jedis = new Jedis(host, port);
+        jedis.getClient().setConnectionTimeout(connectionTimeout);
+        jedis.getClient().setSoTimeout(soTimeout);
+        if (StringUtils.isNotBlank(password)) {
+            jedis.auth(password);
+        }
+        return jedis;
+    }
 
-	@Override
-	public Jedis getJedis(String host, int port, String password) {
-		Jedis jedis = new Jedis(host, port);
-		jedis.getClient().setConnectionTimeout(Protocol.DEFAULT_TIMEOUT);
-		jedis.getClient().setSoTimeout(Protocol.DEFAULT_TIMEOUT);
-		if (StringUtils.isNotBlank(password)) {
-			jedis.auth(password);
-		}
-		return jedis;
-	}
-	
-	@Override
-	public Jedis getJedis(String host, int port) {
-		return getJedis(host, port, null);
-	}
+    @Override
+    public Jedis getJedis(String host, int port, String password) {
+        Jedis jedis = new Jedis(host, port);
+        jedis.getClient().setConnectionTimeout(Protocol.DEFAULT_TIMEOUT);
+        jedis.getClient().setSoTimeout(Protocol.DEFAULT_TIMEOUT);
+        if (StringUtils.isNotBlank(password)) {
+            jedis.auth(password);
+        }
+        return jedis;
+    }
 
-    
+    @Override
+    public Jedis getJedis(String host, int port) {
+        return getJedis(host, port, null);
+    }
 
-	
 
 }
