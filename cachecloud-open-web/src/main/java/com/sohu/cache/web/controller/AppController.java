@@ -12,16 +12,14 @@ import com.sohu.cache.stats.app.AppStatsCenter;
 import com.sohu.cache.stats.instance.InstanceStatsCenter;
 import com.sohu.cache.util.ConstUtils;
 import com.sohu.cache.util.DemoCodeUtil;
-import com.sohu.cache.web.vo.AppDetailVO;
 import com.sohu.cache.web.chart.model.HighchartPoint;
 import com.sohu.cache.web.chart.model.SimpleChartData;
 import com.sohu.cache.web.enums.SuccessEnum;
 import com.sohu.cache.web.util.AppEmailUtil;
 import com.sohu.cache.web.util.DateUtil;
 import com.sohu.cache.web.util.Page;
-
+import com.sohu.cache.web.vo.AppDetailVO;
 import net.sf.json.JSONArray;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
@@ -37,7 +35,6 @@ import org.springframework.web.servlet.ModelAndView;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -59,7 +56,7 @@ import java.util.concurrent.TimeUnit;
 @RequestMapping("/admin/app")
 public class AppController extends BaseController {
     private Logger logger = LoggerFactory.getLogger(AppController.class);
-    
+
     @Resource(name = "appStatsCenter")
     private AppStatsCenter appStatsCenter;
 
@@ -68,38 +65,40 @@ public class AppController extends BaseController {
 
     @Resource(name = "appDeployCenter")
     private AppDeployCenter appDeployCenter;
-    
+
     @Resource(name = "instanceStatsCenter")
     private InstanceStatsCenter instanceStatsCenter;
-    
+
     @Resource(name = "appDailyDataCenter")
     private AppDailyDataCenter appDailyDataCenter;
-    
+
     /**
      * 初始化贡献者页面
+     *
      * @return
      */
     @RequestMapping("/initBecomeContributor")
     public ModelAndView doInitBecomeContributor(HttpServletRequest request,
-                        HttpServletResponse response, Model model){
+                                                HttpServletResponse response, Model model) {
         model.addAttribute("currentUser", getUserInfo(request));
         return new ModelAndView("app/initBecomeContributor");
     }
-    
+
     /**
      * 成为cachecloud贡献者
-     * @param groupName 项目组
+     *
+     * @param groupName   项目组
      * @param applyReason 申请理由
      * @return
      */
     @RequestMapping("/addBecomeContributor")
     public ModelAndView doAddBecomeContributor(HttpServletRequest request,
-                        HttpServletResponse response, Model model, String groupName, String applyReason){
+                                               HttpServletResponse response, Model model, String groupName, String applyReason) {
         appEmailUtil.noticeBecomeContributor(groupName, applyReason, getUserInfo(request));
         model.addAttribute("success", SuccessEnum.SUCCESS.value());
-        return new ModelAndView("");    
+        return new ModelAndView("");
     }
-    
+
     /**
      * 单个应用首页
      *
@@ -117,7 +116,7 @@ public class AppController extends BaseController {
         if (appId == null) {
             return new ModelAndView("redirect:/admin/app/list");
         }
-        
+
         // 日期转换
         String startDateParam = request.getParameter("startDate");
         String endDateParam = request.getParameter("endDate");
@@ -126,7 +125,7 @@ public class AppController extends BaseController {
             startDateParam = DateUtil.formatDate(startDate, "yyyy-MM-dd");
             endDateParam = DateUtil.formatDate(DateUtils.addDays(startDate, 1), "yyyy-MM-dd");
         }
-        
+
         //慢查询
         String slowLogStartDateParam = request.getParameter("slowLogStartDate");
         String slowLogEndDateParam = request.getParameter("slowLogEndDate");
@@ -135,13 +134,13 @@ public class AppController extends BaseController {
             slowLogStartDateParam = DateUtil.formatDate(startDate, "yyyy-MM-dd");
             slowLogEndDateParam = DateUtil.formatDate(DateUtils.addDays(startDate, 1), "yyyy-MM-dd");
         }
-        
+
         //日报
         String dailyDateParam = request.getParameter("dailyDate");
         if (StringUtils.isBlank(dailyDateParam)) {
             dailyDateParam = DateUtil.formatDate(DateUtils.addDays(new Date(), -1), "yyyy-MM-dd");
         }
-        
+
         model.addAttribute("startDate", startDateParam);
         model.addAttribute("endDate", endDateParam);
         model.addAttribute("slowLogStartDate", slowLogStartDateParam);
@@ -150,13 +149,13 @@ public class AppController extends BaseController {
         model.addAttribute("appId", appId);
         model.addAttribute("tabTag", tabTag);
         model.addAttribute("firstCommand", firstCommand);
-        
+
 
         return new ModelAndView("app/userAppsIndex");
 
     }
 
-    
+
     /**
      * 应用统计相关
      */
@@ -171,7 +170,7 @@ public class AppController extends BaseController {
         TimeBetween timeBetween = getTimeBetween(request, model, "startDate", "endDate");
         long beginTime = timeBetween.getStartTime();
         long endTime = timeBetween.getEndTime();
-        
+
         // 3.是否超过1天
         if (endTime - beginTime > TimeUnit.DAYS.toMillis(1)) {
             model.addAttribute("betweenOneDay", 0);
@@ -182,7 +181,7 @@ public class AppController extends BaseController {
         // 4. top5命令
         List<AppCommandStats> top5Commands = appStatsCenter.getTopLimitAppCommandStatsList(appId, beginTime, endTime, 5);
         model.addAttribute("top5Commands", top5Commands);
-        
+
         // 5.峰值
         List<AppCommandStats> top5ClimaxList = new ArrayList<AppCommandStats>();
         if (CollectionUtils.isNotEmpty(top5Commands)) {
@@ -198,9 +197,10 @@ public class AppController extends BaseController {
         model.addAttribute("appId", appId);
         return new ModelAndView("app/appStat");
     }
-    
+
     /**
      * 命令曲线
+     *
      * @param firstCommand 第一条命令
      */
     @RequestMapping("/commandAnalysis")
@@ -259,7 +259,7 @@ public class AppController extends BaseController {
         fillAppInstanceStats(appId, model);
         return new ModelAndView("app/appTopology");
     }
-    
+
     /**
      * 应用机器拓扑图
      *
@@ -268,7 +268,7 @@ public class AppController extends BaseController {
      */
     @RequestMapping("/machineInstancesTopology")
     public ModelAndView machineInstancesTopology(HttpServletRequest request,
-                                     HttpServletResponse response, Long appId, Model model) {
+                                                 HttpServletResponse response, Long appId, Model model) {
         //应用信息
         AppDesc appDesc = appService.getByAppId(appId);
         model.addAttribute("appDesc", appDesc);
@@ -315,7 +315,7 @@ public class AppController extends BaseController {
         write(response, result);
         return null;
     }
-    
+
     /**
      * 获取某个命令时间分布图
      *
@@ -324,7 +324,7 @@ public class AppController extends BaseController {
      */
     @RequestMapping("/getMutiDatesCommandStats")
     public ModelAndView getMutiDatesCommandStats(HttpServletRequest request,
-                                        HttpServletResponse response, Model model, Long appId) throws ParseException {
+                                                 HttpServletResponse response, Model model, Long appId) throws ParseException {
         TimeBetween timeBetween = getJsonTimeBetween(request);
         // 命令参数
         String commandName = request.getParameter("commandName");
@@ -339,7 +339,7 @@ public class AppController extends BaseController {
         return new ModelAndView("");
     }
 
-    
+
     /**
      * 获取命中率、丢失率等分布
      *
@@ -360,6 +360,7 @@ public class AppController extends BaseController {
 
     /**
      * 多命令
+     *
      * @param appId
      * @param statName
      * @return
@@ -367,7 +368,7 @@ public class AppController extends BaseController {
      */
     @RequestMapping("/getMutiStatAppStats")
     public ModelAndView getMutiStatAppStats(HttpServletRequest request,
-                                    HttpServletResponse response, Model model, Long appId) throws ParseException {
+                                            HttpServletResponse response, Model model, Long appId) throws ParseException {
         String statNames = request.getParameter("statName");
         List<String> statNameList = Arrays.asList(statNames.split(ConstUtils.COMMA));
         TimeBetween timeBetween = getJsonTimeBetween(request);
@@ -386,17 +387,18 @@ public class AppController extends BaseController {
      */
     @RequestMapping("/getMutiDatesAppStats")
     public ModelAndView getMutiDatesAppStats(HttpServletRequest request,
-                                    HttpServletResponse response, Model model, Long appId,
-                                    String statName, Integer addDay) throws ParseException {
+                                             HttpServletResponse response, Model model, Long appId,
+                                             String statName, Integer addDay) throws ParseException {
         TimeBetween timeBetween = getJsonTimeBetween(request);
         List<AppStats> appStats = appStatsCenter.getAppStatsList(appId, timeBetween.getStartTime(), timeBetween.getEndTime(), TimeDimensionalityEnum.MINUTE);
         String result = assembleMutilDateAppStatsJsonMinute(appStats, statName, timeBetween.getStartDate(), timeBetween.getEndDate());
         model.addAttribute("data", result);
         return new ModelAndView("");
     }
-    
+
     /**
      * 获取指定时间内某个应用全部实例的统计信息
+     *
      * @param appId
      */
     @RequestMapping("/appInstanceNetStat")
@@ -408,28 +410,28 @@ public class AppController extends BaseController {
 
         // 日期格式转换
         getTimeBetween(request, model, "startDate", "endDate");
-        
+
         return new ModelAndView("app/appInstanceNetStat");
     }
-    
-    
-    
+
+
     /**
      * 获取指定时间内某个应用全部实例的统计信息
+     *
      * @param appId 应用流量
      */
     @RequestMapping("/getAppInstancesNetStat")
     public ModelAndView getAppInstancesNetStat(HttpServletRequest request, HttpServletResponse response, Model model, Long appId) throws ParseException {
         //时间转换
         TimeBetween timeBetween = getJsonTimeBetween(request);
-        
+
         //缩减字段
         String netInCommand = "total_net_input_bytes";
         String netOutCommand = "total_net_output_bytes";
-        Map<String,String> commandMap = new HashMap<String, String>();
+        Map<String, String> commandMap = new HashMap<String, String>();
         commandMap.put(netInCommand, "i");
         commandMap.put(netOutCommand, "o");
-        
+
         //获取应用下所有实例网络流量统计
         Map<Integer, Map<String, List<InstanceCommandStats>>> appInstancesNetStat = instanceStatsCenter
                 .getStandardStatsList(appId, timeBetween.getStartTime(), timeBetween.getEndTime(),
@@ -439,13 +441,13 @@ public class AppController extends BaseController {
         List<Map<String, Object>> appInstancesNetStatList = new ArrayList<Map<String, Object>>();
         for (Entry<Integer, Map<String, List<InstanceCommandStats>>> entry : appInstancesNetStat.entrySet()) {
             Integer instanceId = entry.getKey();
-            
+
             //实例基本信息
             Map<String, Object> instanceStatMap = new HashMap<String, Object>();
             instanceStatMap.put("instanceId", instanceId);
             InstanceInfo instanceInfo = instanceStatsCenter.getInstanceInfo(instanceId);
             instanceStatMap.put("instanceInfo", instanceInfo.getIp() + ":" + instanceInfo.getPort());
-            
+
             //每个实例的统计信息
             List<Map<String, Object>> instanceNetStatMapList = new ArrayList<Map<String, Object>>();
             instanceStatMap.put("instanceNetStatMapList", instanceNetStatMapList);
@@ -466,10 +468,10 @@ public class AppController extends BaseController {
                 //精简字段
                 command = commandMap.get(command);
                 if (total.containsKey(timestamp)) {
-                    Map<String,Object> tmpMap = total.get(timestamp);
+                    Map<String, Object> tmpMap = total.get(timestamp);
                     tmpMap.put(command, commandCount);
                 } else {
-                    Map<String,Object> tmpMap = new HashMap<String, Object>();
+                    Map<String, Object> tmpMap = new HashMap<String, Object>();
                     tmpMap.put("t", timestamp);
                     tmpMap.put(command, commandCount);
                     total.put(timestamp, tmpMap);
@@ -477,15 +479,14 @@ public class AppController extends BaseController {
                 }
             }
         }
-        
+
         String result = JSONObject.toJSONString(appInstancesNetStatList);
         write(response, result);
         return null;
     }
-    
+
 
     /**
-     *
      * @param appId
      * @throws ParseException
      */
@@ -501,7 +502,6 @@ public class AppController extends BaseController {
 
     /**
      * 应用各个命令分布情况
-
      *
      * @param appId 应用id
      * @throws ParseException
@@ -515,8 +515,8 @@ public class AppController extends BaseController {
         write(response, result);
         return null;
     }
-    
-    
+
+
     /**
      * 应用列表
      *
@@ -541,7 +541,7 @@ public class AppController extends BaseController {
         int totalCount = appService.getAppDescCount(currentUser, appSearch);
         int pageNo = NumberUtils.toInt(request.getParameter("pageNo"), 1);
         int pageSize = NumberUtils.toInt(request.getParameter("pageSize"), 10);
-        Page page = new Page(pageNo,pageSize, totalCount);
+        Page page = new Page(pageNo, pageSize, totalCount);
         model.addAttribute("page", page);
 
         // 2.2 查询指定时间客户端异常
@@ -642,15 +642,16 @@ public class AppController extends BaseController {
      */
     @RequestMapping("/commandExecute")
     public ModelAndView commandExecute(HttpServletRequest request, HttpServletResponse response, Model model, Long appId) {
-        if (appId != null && appId > 0) {
-            model.addAttribute("appId", appId);
+        try {
             String command = request.getParameter("command");
             String result = appStatsCenter.executeCommand(appId, command);
+            model.addAttribute("appId", appId);
             model.addAttribute("result", result);
-        } else {
-            model.addAttribute("result", "error");
+        } catch (Exception e) {
+            model.addAttribute("result", e.getMessage());
+        } finally {
+            return new ModelAndView("app/commandExecute");
         }
-        return new ModelAndView("app/commandExecute");
     }
 
     /**
@@ -681,9 +682,10 @@ public class AppController extends BaseController {
         }
         return null;
     }
-    
+
     /**
      * 更新用户
+     *
      * @param name
      * @param chName
      * @param email
@@ -694,8 +696,8 @@ public class AppController extends BaseController {
      */
     @RequestMapping(value = "/changeAppUserInfo")
     public ModelAndView doAddUser(HttpServletRequest request,
-            HttpServletResponse response, Model model, String name, String chName, String email, String mobile,
-            Integer type, Long userId) {
+                                  HttpServletResponse response, Model model, String name, String chName, String email, String mobile,
+                                  Integer type, Long userId) {
         // 后台暂时不对参数进行验证
         AppUser appUser = AppUser.buildFrom(userId, name, chName, email, mobile, type);
         try {
@@ -711,7 +713,7 @@ public class AppController extends BaseController {
         }
         return null;
     }
-    
+
 
     /**
      * 扩容申请
@@ -745,12 +747,12 @@ public class AppController extends BaseController {
                                           HttpServletResponse response, Model model, Long appId, Long instanceId, String appConfigKey, String appConfigValue, String appConfigReason) {
         AppUser appUser = getUserInfo(request);
         AppDesc appDesc = appService.getByAppId(appId);
-        AppAudit appAudit = appService.saveAppChangeConfig(appDesc, appUser, instanceId, appConfigKey, appConfigValue,appConfigReason, AppAuditType.APP_MODIFY_CONFIG);
+        AppAudit appAudit = appService.saveAppChangeConfig(appDesc, appUser, instanceId, appConfigKey, appConfigValue, appConfigReason, AppAuditType.APP_MODIFY_CONFIG);
         appEmailUtil.noticeAppResult(appDesc, appAudit);
         write(response, String.valueOf(SuccessEnum.SUCCESS.value()));
         return null;
     }
-    
+
     /**
      * 实例修改配置申请
      *
@@ -761,7 +763,7 @@ public class AppController extends BaseController {
      */
     @RequestMapping(value = "/changeInstanceConfig")
     public ModelAndView doChangeInstanceConfig(HttpServletRequest request,
-                                          HttpServletResponse response, Model model, Long appId, Long instanceId, String instanceConfigKey, String instanceConfigValue, String instanceConfigReason) {
+                                               HttpServletResponse response, Model model, Long appId, Long instanceId, String instanceConfigKey, String instanceConfigValue, String instanceConfigReason) {
         AppUser appUser = getUserInfo(request);
         AppDesc appDesc = appService.getByAppId(appId);
         AppAudit appAudit = appService.saveInstanceChangeConfig(appDesc, appUser, instanceId, instanceConfigKey, instanceConfigValue, instanceConfigReason, AppAuditType.INSTANCE_MODIFY_CONFIG);
@@ -800,24 +802,24 @@ public class AppController extends BaseController {
                                                HttpServletResponse response, Model model) {
 
         long appId = NumberUtils.toLong(request.getParameter("appId"), -1);
-        int memAlertValue =  NumberUtils.toInt(request.getParameter("memAlertValue"), -1);
-        int clientConnAlertValue =  NumberUtils.toInt(request.getParameter("clientConnAlertValue"), -1);
-        SuccessEnum result = appService.changeAppAlertConfig(appId, memAlertValue,clientConnAlertValue, getUserInfo(request));
+        int memAlertValue = NumberUtils.toInt(request.getParameter("memAlertValue"), -1);
+        int clientConnAlertValue = NumberUtils.toInt(request.getParameter("clientConnAlertValue"), -1);
+        SuccessEnum result = appService.changeAppAlertConfig(appId, memAlertValue, clientConnAlertValue, getUserInfo(request));
         write(response, String.valueOf(result.value()));
         return null;
     }
-    
+
     /**
      * 修改应用信息
      */
     @RequestMapping(value = "/updateAppDetail")
     public ModelAndView doUpdateAppDetail(HttpServletRequest request,
-                                               HttpServletResponse response, Model model) {
+                                          HttpServletResponse response, Model model) {
         long appId = NumberUtils.toLong(request.getParameter("appId"), 0);
         AppUser appUser = getUserInfo(request);
         logger.warn("{} want to update appId={} info!", appUser.getName(), appId);
-        String appDescName =  request.getParameter("appDescName");
-        String appDescIntro =  request.getParameter("appDescIntro");
+        String appDescName = request.getParameter("appDescName");
+        String appDescIntro = request.getParameter("appDescIntro");
         String officer = request.getParameter("officer");
         SuccessEnum successEnum = SuccessEnum.SUCCESS;
         if (appId <= 0 || StringUtils.isBlank(appDescName) || StringUtils.isBlank(appDescIntro) || StringUtils.isBlank(officer)) {
@@ -837,7 +839,7 @@ public class AppController extends BaseController {
         write(response, String.valueOf(successEnum.value()));
         return null;
     }
-    
+
 
     @RequestMapping(value = "/demo")
     public ModelAndView doDemo(HttpServletRequest request, HttpServletResponse response, Long appId, Model model) {
@@ -847,11 +849,11 @@ public class AppController extends BaseController {
             List<String> dependency = DemoCodeUtil.getDependencyRedis();
             List<String> springConfig = DemoCodeUtil.getSpringConfig(appDesc.getType(), appDesc.getAppId());
             String restApi = DemoCodeUtil.getRestAPI(appDesc.getType(), appDesc.getAppId());
-            
-            if(CollectionUtils.isNotEmpty(springConfig) && springConfig.size() > 0){
+
+            if (CollectionUtils.isNotEmpty(springConfig) && springConfig.size() > 0) {
                 model.addAttribute("springConfig", springConfig);
             }
-            model.addAttribute("dependency",dependency);
+            model.addAttribute("dependency", dependency);
             model.addAttribute("code", code);
             model.addAttribute("status", 1);
             model.addAttribute("restApi", restApi);
@@ -866,7 +868,7 @@ public class AppController extends BaseController {
      */
     @RequestMapping("/daily")
     public ModelAndView appDaily(HttpServletRequest request,
-                                  HttpServletResponse response, Model model, Long appId) throws ParseException {
+                                 HttpServletResponse response, Model model, Long appId) throws ParseException {
         // 1. 应用信息
         AppDesc appDesc = appService.getByAppId(appId);
         model.addAttribute("appDesc", appDesc);
@@ -890,35 +892,36 @@ public class AppController extends BaseController {
 
     /**
      * 应用历史慢查询
+     *
      * @param appId
      * @return
-     * @throws ParseException 
+     * @throws ParseException
      */
     @RequestMapping("/slowLog")
     public ModelAndView appSlowLog(HttpServletRequest request,
-                                  HttpServletResponse response, Model model, Long appId) throws ParseException {
+                                   HttpServletResponse response, Model model, Long appId) throws ParseException {
         // 应用基本信息
         AppDesc appDesc = appService.getByAppId(appId);
         model.addAttribute("appDesc", appDesc);
-        
+
         // 开始和结束日期
         TimeBetween timeBetween = getTimeBetween(request, model, "slowLogStartDate", "slowLogEndDate");
         Date startDate = timeBetween.getStartDate();
         Date endDate = timeBetween.getEndDate();
-        
+
         // 应用慢查询日志
-        Map<String,Long> appInstanceSlowLogCountMap = appStatsCenter.getInstanceSlowLogCountMapByAppId(appId, startDate, endDate);
+        Map<String, Long> appInstanceSlowLogCountMap = appStatsCenter.getInstanceSlowLogCountMapByAppId(appId, startDate, endDate);
         model.addAttribute("appInstanceSlowLogCountMap", appInstanceSlowLogCountMap);
         List<InstanceSlowLog> appInstanceSlowLogList = appStatsCenter.getInstanceSlowLogByAppId(appId, startDate, endDate);
         model.addAttribute("appInstanceSlowLogList", appInstanceSlowLogList);
-        
+
         // 各个实例对应的慢查询日志
         Map<String, List<InstanceSlowLog>> instaceSlowLogMap = new HashMap<String, List<InstanceSlowLog>>();
         Map<String, Long> instanceHostPortIdMap = new HashMap<String, Long>();
-        for(InstanceSlowLog instanceSlowLog : appInstanceSlowLogList) {
+        for (InstanceSlowLog instanceSlowLog : appInstanceSlowLogList) {
             String hostPort = instanceSlowLog.getIp() + ":" + instanceSlowLog.getPort();
             instanceHostPortIdMap.put(hostPort, instanceSlowLog.getInstanceId());
-            if(instaceSlowLogMap.containsKey(hostPort)) {
+            if (instaceSlowLogMap.containsKey(hostPort)) {
                 instaceSlowLogMap.get(hostPort).add(instanceSlowLog);
             } else {
                 List<InstanceSlowLog> list = new ArrayList<InstanceSlowLog>();
@@ -929,10 +932,10 @@ public class AppController extends BaseController {
         model.addAttribute("instaceSlowLogMap", instaceSlowLogMap);
         model.addAttribute("instanceHostPortIdMap", instanceHostPortIdMap);
 
-        
+
         return new ModelAndView("app/slowLog");
     }
-    
+
     /**
      * 清理应用数据
      */
@@ -989,7 +992,7 @@ public class AppController extends BaseController {
         JSONArray jsonArray = JSONArray.fromObject(list);
         return jsonArray.toString();
     }
-    
+
     private String assembleMutilDateAppCommandJsonMinute(List<AppCommandStats> appCommandStats, Date startDate, Date endDate) {
         if (appCommandStats == null || appCommandStats.isEmpty()) {
             return "[]";
@@ -1018,9 +1021,10 @@ public class AppController extends BaseController {
         net.sf.json.JSONObject jsonObject = net.sf.json.JSONObject.fromObject(map);
         return jsonObject.toString();
     }
-    
+
     /**
      * 多命令组装
+     *
      * @param appStats
      * @param statNameList
      * @param startDate
@@ -1031,7 +1035,7 @@ public class AppController extends BaseController {
             return "[]";
         }
         Map<String, List<HighchartPoint>> map = new HashMap<String, List<HighchartPoint>>();
-        for(String statName : statNameList) {
+        for (String statName : statNameList) {
             List<HighchartPoint> list = new ArrayList<HighchartPoint>();
             for (AppStats stat : appStats) {
                 try {
@@ -1049,9 +1053,10 @@ public class AppController extends BaseController {
         net.sf.json.JSONObject jsonObject = net.sf.json.JSONObject.fromObject(map);
         return jsonObject.toString();
     }
-    
+
     /**
      * 多时间组装
+     *
      * @param appStats
      * @param statName
      * @param startDate

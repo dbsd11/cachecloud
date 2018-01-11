@@ -1,14 +1,12 @@
 package com.sohu.cache.web.controller;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import com.sohu.cache.entity.AppAudit;
+import com.sohu.cache.entity.AppUser;
+import com.sohu.cache.entity.InstanceInfo;
+import com.sohu.cache.redis.RedisCenter;
+import com.sohu.cache.stats.instance.InstanceDeployCenter;
+import com.sohu.cache.stats.instance.InstanceStatsCenter;
+import com.sohu.cache.web.enums.SuccessEnum;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.slf4j.Logger;
@@ -18,18 +16,16 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
-import com.sohu.cache.entity.AppAudit;
-import com.sohu.cache.entity.AppUser;
-import com.sohu.cache.entity.InstanceInfo;
-import com.sohu.cache.redis.RedisCenter;
-import com.sohu.cache.redis.RedisDeployCenter;
-import com.sohu.cache.stats.instance.InstanceDeployCenter;
-import com.sohu.cache.stats.instance.InstanceStatsCenter;
-import com.sohu.cache.web.enums.SuccessEnum;
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * 应用后台管理
- * 
+ *
  * @author leifu
  * @Time 2014年7月3日
  */
@@ -41,16 +37,16 @@ public class InstanceManageController extends BaseController {
 
     @Resource(name = "instanceDeployCenter")
     private InstanceDeployCenter instanceDeployCenter;
-    
+
     @Resource(name = "redisCenter")
     private RedisCenter redisCenter;
-    
+
     @Resource(name = "instanceStatsCenter")
     private InstanceStatsCenter instanceStatsCenter;
-    
+
     /**
      * 上线(和下线分开)
-     * 
+     *
      * @param instanceId
      */
     @RequestMapping(value = "/startInstance")
@@ -80,7 +76,7 @@ public class InstanceManageController extends BaseController {
 
     /**
      * 下线实例
-     * 
+     *
      * @param instanceId
      * @param ip
      */
@@ -91,7 +87,8 @@ public class InstanceManageController extends BaseController {
         boolean result = false;
         if (instanceId > 0) {
             try {
-                result = instanceDeployCenter.shutdownExistInstance(appId, instanceId);
+                result = true;
+//                result = instanceDeployCenter.shutdownExistInstance(appId, instanceId);
             } catch (Exception e) {
                 logger.error(e.getMessage(), e);
                 model.addAttribute("message", e.getMessage());
@@ -108,9 +105,10 @@ public class InstanceManageController extends BaseController {
         }
         return new ModelAndView();
     }
-    
+
     /**
      * 查看redis节点日志
+     *
      * @param appId
      * @param slaveInstanceId
      */
@@ -124,15 +122,15 @@ public class InstanceManageController extends BaseController {
         model.addAttribute("instanceLogList", StringUtils.isBlank(instanceLogStr) ? Collections.emptyList() : Arrays.asList(instanceLogStr.split("\n")));
         return new ModelAndView("manage/instance/log");
     }
-    
+
     /**
      * 处理实例配置修改
-     * 
+     *
      * @param appAuditId 审批id
      */
     @RequestMapping(value = "/initInstanceConfigChange")
     public ModelAndView doInitInstanceConfigChange(HttpServletRequest request,
-            HttpServletResponse response, Model model, Long appAuditId) {
+                                                   HttpServletResponse response, Model model, Long appAuditId) {
         // 申请原因
         AppAudit appAudit = appService.getAppAuditById(appAuditId);
         model.addAttribute("appAudit", appAudit);
@@ -156,19 +154,18 @@ public class InstanceManageController extends BaseController {
     }
 
     /**
-     * 
-     * @param appId 应用id
-     * @param host 实例ip
-     * @param port 实例端口
-     * @param instanceConfigKey 实例配置key
+     * @param appId               应用id
+     * @param host                实例ip
+     * @param port                实例端口
+     * @param instanceConfigKey   实例配置key
      * @param instanceConfigValue 实例配置value
-     * @param appAuditId 审批id
+     * @param appAuditId          审批id
      * @return
      */
     @RequestMapping(value = "/addInstanceConfigChange")
     public ModelAndView doAddAppConfigChange(HttpServletRequest request,
-            HttpServletResponse response, Model model, Long appId, String host, int port,
-            String instanceConfigKey, String instanceConfigValue, Long appAuditId) {
+                                             HttpServletResponse response, Model model, Long appId, String host, int port,
+                                             String instanceConfigKey, String instanceConfigValue, Long appAuditId) {
         AppUser appUser = getUserInfo(request);
         logger.warn("user {} change instanceConfig:appId={},{}:{};key={};value={},appAuditId:{}", appUser.getName(), appId, host, port, instanceConfigKey, instanceConfigValue, appAuditId);
         boolean isModify = false;
@@ -182,10 +179,6 @@ public class InstanceManageController extends BaseController {
         logger.warn("user {} change instanceConfig:appId={},{}:{};key={};value={},appAuditId:{},result is:{}", appUser.getName(), appId, host, port, instanceConfigKey, instanceConfigValue, appAuditId, isModify);
         return new ModelAndView("redirect:/manage/app/auditList");
     }
-    
-    
-    
-    
-    
-    
+
+
 }

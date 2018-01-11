@@ -1,5 +1,6 @@
 package com.sohu.cache.redis.impl;
 
+import com.axhs.tool.redis.ShardedJedisSentinelPool;
 import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Table;
 import com.sohu.cache.async.AsyncService;
@@ -26,7 +27,6 @@ import com.sohu.cache.entity.InstanceSlotModel;
 import com.sohu.cache.entity.InstanceSlowLog;
 import com.sohu.cache.entity.InstanceStats;
 import com.sohu.cache.machine.MachineCenter;
-import com.sohu.cache.protocol.RedisProtocol;
 import com.sohu.cache.redis.RedisCenter;
 import com.sohu.cache.redis.enums.RedisInfoEnum;
 import com.sohu.cache.schedule.SchedulerCenter;
@@ -50,9 +50,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.Assert;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisCommands;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisSentinelPool;
 import redis.clients.jedis.Protocol;
+import redis.clients.jedis.ShardedJedis;
 import redis.clients.jedis.exceptions.JedisAskDataException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisMovedDataException;
@@ -61,11 +64,15 @@ import redis.clients.util.ClusterNodeInformationParser;
 import redis.clients.util.SafeEncoder;
 import redis.clients.util.Slowlog;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.Timestamp;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * Created by yijunzhang on 14-6-10.
@@ -1022,28 +1029,57 @@ public class RedisCenterImpl implements RedisCenter {
     }
 
     @Override
-    public String executeCommand(AppDesc appDesc, String command) {
+    public String executeCommand(AppDesc appDesc, String command) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException {
         //非测试应用只能执行白名单里面的命令
         int type = appDesc.getType();
         long appId = appDesc.getAppId();
         String password = appDesc.getPassword();
         if (type == ConstUtils.CACHE_REDIS_SENTINEL) {
-            JedisSentinelPool jedisSentinelPool = getJedisSentinelPool(appDesc);
-            if (jedisSentinelPool == null) {
-                return "sentinel can not execute ";
-            }
-            Jedis jedis = null;
-            try {
-                jedis = jedisSentinelPool.getResource();
-                String host = jedis.getClient().getHost();
-                int port = jedis.getClient().getPort();
-                return executeCommand(appId, host, port, command);
-            } catch (Exception e) {
-                logger.error(e.getMessage(), e);
-                return "运行出错:" + e.getMessage();
+            Set<String> sentinelHosts = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getHostPort()).collect(Collectors.toSet());
+            List<String> masters = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getCmd()).collect(Collectors.toList());
+            ShardedJedisSentinelPool pool = new ShardedJedisSentinelPool(new JedisPoolConfig(), masters, sentinelHosts);
+            try (ShardedJedis jedis = pool.getResource()) {
+                List<String> commandList = Arrays.asList(command.split(" ")).stream().filter(cmd -> !StringUtils.isEmpty(cmd)).collect(Collectors.toList());
+                String cmd = commandList.remove(0);
+                if (cmd.equalsIgnoreCase("keys")) {
+                    return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.keys(commandList.get(0)).stream()).collect(Collectors.toList()).toString();
+                }
+                for (Method method : JedisCommands.class.getMethods()) {
+                    if (!cmd.equalsIgnoreCase(method.getName())) {
+                        continue;
+                    }
+                    //参数包含范型则不判断参数长度
+                    if (!method.getParameterTypes()[method.getParameterCount() - 1].isArray() && commandList.size() != method.getParameterCount()) {
+                        continue;
+                    }
+
+                    List<Object> paramList = new LinkedList<>();
+                    for (Class paramType : method.getParameterTypes()) {
+                        if (paramType.isArray()) {
+                            paramList.add(commandList.toArray((Object[])Array.newInstance(paramType.getComponentType(), 0)));
+                            break;
+                        }
+                        if (!paramType.isPrimitive()) {
+                            paramList.add(paramType.getConstructor(String.class).newInstance(commandList.remove(0)));
+                        } else {
+                            if (paramType.isAssignableFrom(long.class)) {
+                                paramList.add(Long.valueOf(commandList.remove(0)));
+                            }
+                            if (paramType.isAssignableFrom(double.class)) {
+                                paramList.add(Double.valueOf(commandList.remove(0)));
+                            }
+                            if (paramType.isAssignableFrom(int.class)) {
+                                paramList.add(Integer.valueOf(commandList.remove(0)));
+                            }
+                            if (paramType.isAssignableFrom(boolean.class)) {
+                                paramList.add(Boolean.valueOf(commandList.remove(0)));
+                            }
+                        }
+                    }
+                    return method.invoke(jedis, paramList.toArray()).toString();
+                }
             } finally {
-                if (jedis != null) jedis.close();
-                jedisSentinelPool.destroy();
+                pool.destroy();
             }
         } else if (type == ConstUtils.CACHE_REDIS_STANDALONE) {
             List<InstanceInfo> instanceList = instanceDao.getInstListByAppId(appId);
@@ -1146,11 +1182,12 @@ public class RedisCenterImpl implements RedisCenter {
 //                return "online app only support read-only and safe command ";
 //            }
 //        }
-        String password = appDesc.getPassword();
-        String shell = RedisProtocol.getExecuteCommandShell(host, port, password, command);
-        //记录客户端发送日志
-        logger.warn("executeRedisShell={}", shell);
-        return machineCenter.executeShell(host, shell);
+//        String password = appDesc.getPassword();
+//        String shell = RedisProtocol.getExecuteCommandShell(host, port, password, command);
+//        //记录客户端发送日志
+//        logger.warn("executeRedisShell={}", shell);
+//        return machineCenter.executeShell(host, shell);
+        throw new RuntimeException("not allowd ssh command");
     }
 
     @Override
@@ -1275,18 +1312,19 @@ public class RedisCenterImpl implements RedisCenter {
 
     @Override
     public boolean configRewrite(final long appId, final String host, final int port) {
-        return new IdempotentConfirmer() {
-            @Override
-            public boolean execute() {
-                Jedis jedis = getJedis(appId, host, port, REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
-                try {
-                    String response = jedis.configRewrite();
-                    return response != null && response.equalsIgnoreCase("OK");
-                } finally {
-                    jedis.close();
-                }
-            }
-        }.run();
+//        return new IdempotentConfirmer() {
+//            @Override
+//            public boolean execute() {
+//                Jedis jedis = getJedis(appId, host, port, REDIS_DEFAULT_TIME, REDIS_DEFAULT_TIME);
+//                try {
+//                    String response = jedis.configRewrite();
+//                    return response != null && response.equalsIgnoreCase("OK");
+//                } finally {
+//                    jedis.close();
+//                }
+//            }
+//        }.run();
+        return true;
     }
 
     @Override
@@ -1989,4 +2027,28 @@ public class RedisCenterImpl implements RedisCenter {
     }
 
 
+    public static final String CHAR_PATTERN = "[^0-9]";
+    public static final String INT_PATTERN = "^-?[1-9]\\d*$";
+    public static final String DOUBLE_PATTERN = "^[-]?[1-9]\\d*\\.\\d*|-0\\.\\d*[1-9]\\d*$";
+
+    public static Object convert(String item) {
+        // 忽略所有空字符串或全是空格的字符串
+        if (StringUtils.isEmpty(item)) {
+            return null;
+        }
+        item = item.trim();
+        if ("true".equalsIgnoreCase(item) || "false".equalsIgnoreCase(item)) {
+            return Boolean.valueOf(item);
+        }
+        if (item.matches(CHAR_PATTERN)) {
+            return Character.toString(item.charAt(0));
+        }
+        if (item.matches(INT_PATTERN)) {
+            return Integer.valueOf(item);
+        }
+        if (item.matches(DOUBLE_PATTERN)) {
+            return Double.valueOf(item);
+        }
+        return item;
+    }
 }

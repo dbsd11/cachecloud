@@ -1,5 +1,6 @@
 package com.sohu.test.app;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
 import com.sohu.cache.entity.AppCommandGroup;
@@ -57,7 +58,7 @@ public class AppStatsCenterImplTest extends BaseTest {
     }
 
     @Test
-    public void executeCommandRedisTest() {
+    public void executeCommandRedisTest() throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         long appId = 998L;
         String command = "info all";
         String value = appStatsCenter.executeCommand(appId, command);

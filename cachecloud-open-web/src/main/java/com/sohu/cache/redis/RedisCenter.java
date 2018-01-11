@@ -12,6 +12,7 @@ import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisSentinelPool;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -184,7 +185,7 @@ public interface RedisCenter {
      * @param command
      * @return
      */
-    public String executeCommand(AppDesc appDesc, String command);
+    public String executeCommand(AppDesc appDesc, String command) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException;
 
     /**
      * 实例执行redis命令

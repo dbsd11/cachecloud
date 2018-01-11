@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.Assert;
 
+import java.lang.reflect.InvocationTargetException;
 import java.text.DecimalFormat;
 import java.util.*;
 
@@ -346,7 +347,7 @@ public class AppStatsCenterImpl implements AppStatsCenter {
     }
 
     @Override
-    public String executeCommand(long appId, String command) {
+    public String executeCommand(long appId, String command) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         if (StringUtils.isBlank(command)) {
             return "命令不能为空";
         }

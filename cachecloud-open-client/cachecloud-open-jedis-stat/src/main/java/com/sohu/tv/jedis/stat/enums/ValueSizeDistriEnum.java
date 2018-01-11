@@ -1,13 +1,13 @@
 package com.sohu.tv.jedis.stat.enums;
 
+import com.sohu.tv.jedis.stat.utils.NumberUtil;
+
 import java.util.HashMap;
 import java.util.Map;
 
-import com.sohu.tv.jedis.stat.utils.NumberUtil;
-
 /**
  * 值分布
- * 
+ *
  * @author leifu
  * @Time 2014年7月21日
  */
@@ -50,21 +50,35 @@ public enum ValueSizeDistriEnum {
     public String getInfo() {
         return info;
     }
-    
-    public final static Map<String, ValueSizeDistriEnum> MAP = new HashMap<String, ValueSizeDistriEnum>();
+
+    public final static Map<String, ValueSizeDistriEnum> MAP = new HashMap<>();
+
     static {
         for (ValueSizeDistriEnum enumObject : ValueSizeDistriEnum.values()) {
             MAP.put(enumObject.getValue(), enumObject);
         }
     }
-    
-    public static ValueSizeDistriEnum getByValue(String targetValue){
+
+    public final static Map<Integer, ValueSizeDistriEnum> TYPE_MAP = new HashMap<>();
+
+    static {
+        for (ValueSizeDistriEnum enumObject : ValueSizeDistriEnum.values()) {
+            TYPE_MAP.put(enumObject.getType(), enumObject);
+        }
+    }
+
+    public static ValueSizeDistriEnum getByValue(String targetValue) {
         return MAP.get(targetValue);
     }
 
+    public static ValueSizeDistriEnum getByType(int type) {
+        return TYPE_MAP.get(type);
+    }
+
+
     /**
      * 查看length在哪个区间
-     * 
+     *
      * @param length
      * @return
      */
@@ -80,7 +94,7 @@ public enum ValueSizeDistriEnum {
 
     /**
      * 确定length在指定区间
-     * 
+     *
      * @param enumObject
      * @param size
      * @return
