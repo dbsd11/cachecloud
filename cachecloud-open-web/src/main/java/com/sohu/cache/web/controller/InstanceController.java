@@ -1,15 +1,18 @@
 package com.sohu.cache.web.controller;
 
 import com.sohu.cache.alert.InstanceAlertService;
-import com.sohu.cache.entity.*;
+import com.sohu.cache.entity.AppCommandStats;
+import com.sohu.cache.entity.InstanceCommandStats;
+import com.sohu.cache.entity.InstanceFault;
+import com.sohu.cache.entity.InstanceInfo;
+import com.sohu.cache.entity.InstanceStats;
 import com.sohu.cache.redis.RedisCenter;
 import com.sohu.cache.stats.app.AppStatsCenter;
 import com.sohu.cache.stats.instance.InstanceStatsCenter;
-import com.sohu.cache.util.ConstUtils;
-import com.sohu.cache.web.vo.RedisSlowLog;
 import com.sohu.cache.web.chart.key.ChartKeysUtil;
 import com.sohu.cache.web.chart.model.SplineChartEntity;
 import com.sohu.cache.web.util.DateUtil;
+import com.sohu.cache.web.vo.RedisSlowLog;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang.time.DateUtils;
@@ -24,7 +27,12 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.text.ParseException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by hym on 14-7-27.
@@ -379,13 +387,13 @@ public class InstanceController {
 
     @RequestMapping("/commandExecute")
     public ModelAndView commandExecute(HttpServletRequest request, HttpServletResponse response, Model model, Integer admin, Long instanceId, Long appId) {
-        if (instanceId != null && instanceId > 0) {
+        try {
             model.addAttribute("instanceId", instanceId);
             String command = request.getParameter("command");
             String result = instanceStatsCenter.executeCommand(instanceId, command);
             model.addAttribute("result", result);
-        } else {
-            model.addAttribute("result", "error");
+        } catch (Exception e) {
+            model.addAttribute("result", e.getMessage());
         }
         return new ModelAndView("instance/commandExecute");
     }

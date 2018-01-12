@@ -21,7 +21,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.Assert;
 
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -35,7 +41,7 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
     private InstanceStatsDao instanceStatsDao;
 
     private RedisCenter redisCenter;
-    
+
     @Override
     public InstanceInfo getInstanceInfo(long instanceId) {
         return instanceDao.getInstanceInfoById(instanceId);
@@ -75,7 +81,7 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
 
     @Override
     public List<InstanceCommandStats> getCommandStatsList(Long instanceId, long beginTime, long endTime,
-            String commandName) {
+                                                          String commandName) {
         if (instanceId == null) {
             return Collections.emptyList();
         }
@@ -84,7 +90,8 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
         String ip = instanceInfo.getIp();
         int port = instanceInfo.getPort();
         int type = instanceInfo.getType();
-        List<Map<String, Object>> objectList = this.queryDiffMapList(beginTime, endTime, ip, port, ConstUtils.REDIS);;
+        List<Map<String, Object>> objectList = this.queryDiffMapList(beginTime, endTime, ip, port, ConstUtils.REDIS);
+        ;
         if (objectList != null) {
             for (Map<String, Object> map : objectList) {
                 InstanceCommandStats stats = parseCommand(instanceId, commandName, map, true, type);
@@ -99,7 +106,7 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
 
     @Override
     public Map<Integer, Map<String, List<InstanceCommandStats>>> getStandardStatsList(Long appId, long beginTime,
-            long endTime, List<String> commands) {
+                                                                                      long endTime, List<String> commands) {
         if (appId == null) {
             return Collections.emptyMap();
         }
@@ -117,10 +124,11 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
             int port = instance.getPort();
             int type = instance.getType();
             Boolean isMaster = redisCenter.isMaster(appId, ip, port);
-            if (BooleanUtils.isNotTrue(isMaster)){
+            if (BooleanUtils.isNotTrue(isMaster)) {
                 continue;
             }
-            List<Map<String, Object>> objectList = this.queryDiffMapList(beginTime, endTime, ip, port, ConstUtils.REDIS);;
+            List<Map<String, Object>> objectList = this.queryDiffMapList(beginTime, endTime, ip, port, ConstUtils.REDIS);
+            ;
             if (objectList != null) {
                 Map<String, List<InstanceCommandStats>> commandMap = new LinkedHashMap<String, List<InstanceCommandStats>>();
                 for (String commandName : commands) {
@@ -140,7 +148,7 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
     }
 
     private InstanceCommandStats parseCommand(long instanceId, String command,
-            Map<String, Object> commandMap, boolean isCommand, int type) {
+                                              Map<String, Object> commandMap, boolean isCommand, int type) {
         Long collectTime = MapUtils.getLong(commandMap, ConstUtils.COLLECT_TIME, null);
         if (collectTime == null) {
             return null;
@@ -241,7 +249,7 @@ public class InstanceStatsCenterImpl implements InstanceStatsCenter {
 
     @Override
     public List<Map<String, Object>> queryDiffMapList(long beginTime, long endTime, String ip, int port,
-            String dbType) {
+                                                      String dbType) {
         Assert.isTrue(StringUtils.isNotBlank(ip));
         Assert.isTrue(port > 0);
         Assert.isTrue(beginTime > 0);

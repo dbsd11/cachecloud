@@ -53,6 +53,7 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCommands;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.JedisShardInfo;
 import redis.clients.jedis.Protocol;
 import redis.clients.jedis.ShardedJedis;
 import redis.clients.jedis.exceptions.JedisAskDataException;
@@ -1036,45 +1037,7 @@ public class RedisCenterImpl implements RedisCenter {
         if (type == ConstUtils.CACHE_REDIS_SENTINEL) {
             ShardedJedisSentinelPool pool = getShardedJedisSentinelPool(appDesc);
             try (ShardedJedis jedis = pool.getResource()) {
-                List<String> commandList = Arrays.asList(command.split(" ")).stream().filter(cmd -> !StringUtils.isEmpty(cmd)).collect(Collectors.toList());
-                String cmd = commandList.remove(0);
-                if (cmd.equalsIgnoreCase("keys")) {
-                    return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.keys(commandList.get(0)).stream()).collect(Collectors.toList()).toString();
-                }
-                for (Method method : JedisCommands.class.getMethods()) {
-                    if (!cmd.equalsIgnoreCase(method.getName())) {
-                        continue;
-                    }
-                    //参数包含范型则不判断参数长度
-                    if (!method.getParameterTypes()[method.getParameterCount() - 1].isArray() && commandList.size() != method.getParameterCount()) {
-                        continue;
-                    }
-
-                    List<Object> paramList = new LinkedList<>();
-                    for (Class paramType : method.getParameterTypes()) {
-                        if (paramType.isArray()) {
-                            paramList.add(commandList.toArray((Object[]) Array.newInstance(paramType.getComponentType(), 0)));
-                            break;
-                        }
-                        if (!paramType.isPrimitive()) {
-                            paramList.add(paramType.getConstructor(String.class).newInstance(commandList.remove(0)));
-                        } else {
-                            if (paramType.isAssignableFrom(long.class)) {
-                                paramList.add(Long.valueOf(commandList.remove(0)));
-                            }
-                            if (paramType.isAssignableFrom(double.class)) {
-                                paramList.add(Double.valueOf(commandList.remove(0)));
-                            }
-                            if (paramType.isAssignableFrom(int.class)) {
-                                paramList.add(Integer.valueOf(commandList.remove(0)));
-                            }
-                            if (paramType.isAssignableFrom(boolean.class)) {
-                                paramList.add(Boolean.valueOf(commandList.remove(0)));
-                            }
-                        }
-                    }
-                    return method.invoke(jedis, paramList.toArray()).toString();
-                }
+                callCommand(jedis, command);
             } finally {
                 pool.destroy();
             }
@@ -1173,17 +1136,11 @@ public class RedisCenterImpl implements RedisCenter {
         if (appDesc == null) {
             return "not exist appId";
         }
-        //非测试应用只能执行白名单里面的命令
-//        if (AppDescEnum.AppTest.NOT_TEST.getValue() == appDesc.getIsTest()) {
-//            if (!RedisReadOnlyCommandEnum.contains(command)) {
-//                return "online app only support read-only and safe command ";
-//            }
-//        }
-//        String password = appDesc.getPassword();
-//        String shell = RedisProtocol.getExecuteCommandShell(host, port, password, command);
-//        //记录客户端发送日志
-//        logger.warn("executeRedisShell={}", shell);
-//        return machineCenter.executeShell(host, shell);
+
+        try (ShardedJedis shardedJedis = new ShardedJedis(Collections.singletonList(new JedisShardInfo(host, port)))) {
+            callCommand(shardedJedis, command);
+        }
+
         throw new RuntimeException("not allowd ssh command");
     }
 
@@ -1997,5 +1954,55 @@ public class RedisCenterImpl implements RedisCenter {
     @Override
     public Jedis getJedis(String host, int port) {
         return getJedis(host, port, null);
+    }
+
+    String callCommand(ShardedJedis jedis, String command) {
+        try {
+            List<String> commandList = Arrays.asList(command.split(" ")).stream().filter(cmd -> !StringUtils.isEmpty(cmd)).collect(Collectors.toList());
+            String cmd = commandList.remove(0);
+            if (cmd.equalsIgnoreCase("info")) {
+                return jedis.getAllShards().stream().findAny().map(shard -> shard.clusterInfo()).get();
+            }
+            if (cmd.equalsIgnoreCase("keys")) {
+                return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.keys(commandList.get(0)).stream()).collect(Collectors.toList()).toString();
+            }
+            for (Method method : JedisCommands.class.getMethods()) {
+                if (!cmd.equalsIgnoreCase(method.getName())) {
+                    continue;
+                }
+                //参数包含范型则不判断参数长度
+                if (!method.getParameterTypes()[method.getParameterCount() - 1].isArray() && commandList.size() != method.getParameterCount()) {
+                    continue;
+                }
+
+                List<Object> paramList = new LinkedList<>();
+                for (Class paramType : method.getParameterTypes()) {
+                    if (paramType.isArray()) {
+                        paramList.add(commandList.toArray((Object[]) Array.newInstance(paramType.getComponentType(), 0)));
+                        break;
+                    }
+                    if (!paramType.isPrimitive()) {
+                        paramList.add(paramType.getConstructor(String.class).newInstance(commandList.remove(0)));
+                    } else {
+                        if (paramType.isAssignableFrom(long.class)) {
+                            paramList.add(Long.valueOf(commandList.remove(0)));
+                        }
+                        if (paramType.isAssignableFrom(double.class)) {
+                            paramList.add(Double.valueOf(commandList.remove(0)));
+                        }
+                        if (paramType.isAssignableFrom(int.class)) {
+                            paramList.add(Integer.valueOf(commandList.remove(0)));
+                        }
+                        if (paramType.isAssignableFrom(boolean.class)) {
+                            paramList.add(Boolean.valueOf(commandList.remove(0)));
+                        }
+                    }
+                }
+                return method.invoke(jedis, paramList.toArray()).toString();
+            }
+            throw new RuntimeException("unknown command:" + command);
+        } catch (Exception e) {
+            return e.getMessage();
+        }
     }
 }
