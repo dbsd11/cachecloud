@@ -1962,7 +1962,7 @@ public class RedisCenterImpl implements RedisCenter {
                 return jedis.getAllShards().stream().findAny().map(shard -> shard.info()).get();
             }
             if (cmd.equalsIgnoreCase("keys")) {
-                return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.hkeys(commandList.get(0)).stream()).collect(Collectors.toList()).toString();
+                return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.lrange(commandList.get(0), commandList.size() > 1 ? Long.valueOf(commandList.remove(0)) : 0l, commandList.size() > 1 ? Long.valueOf(commandList.remove(0)) : -1l).stream()).collect(Collectors.toList()).toString();
             }
             for (Method method : JedisCommands.class.getMethods()) {
                 if (!cmd.equalsIgnoreCase(method.getName())) {
