@@ -1189,8 +1189,8 @@ public class RedisCenterImpl implements RedisCenter {
 
     @Override
     public ShardedJedisSentinelPool getShardedJedisSentinelPool(AppDesc appDesc) {
-        Set<String> sentinelHosts = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getHostPort()).collect(Collectors.toSet());
-        List<String> masters = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getCmd()).collect(Collectors.toList());
+        Set<String> sentinelHosts = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().filter(instanceInfo -> TypeUtil.isRedisSentinel(instanceInfo.getType())).map(instanceInfo -> instanceInfo.getHostPort()).collect(Collectors.toSet());
+        List<String> masters = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().filter(instanceInfo -> TypeUtil.isRedisSentinel(instanceInfo.getType())).map(instanceInfo -> instanceInfo.getCmd()).collect(Collectors.toList());
         ShardedJedisSentinelPool pool = new ShardedJedisSentinelPool(new JedisPoolConfig(), masters, sentinelHosts);
         return pool;
     }
