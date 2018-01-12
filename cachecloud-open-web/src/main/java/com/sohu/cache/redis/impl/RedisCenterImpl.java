@@ -1037,7 +1037,7 @@ public class RedisCenterImpl implements RedisCenter {
         if (type == ConstUtils.CACHE_REDIS_SENTINEL) {
             ShardedJedisSentinelPool pool = getShardedJedisSentinelPool(appDesc);
             try (ShardedJedis jedis = pool.getResource()) {
-                callCommand(jedis, command);
+                return callCommand(jedis, command);
             } finally {
                 pool.destroy();
             }
@@ -1959,7 +1959,7 @@ public class RedisCenterImpl implements RedisCenter {
             List<String> commandList = Arrays.asList(command.split(" ")).stream().filter(cmd -> !StringUtils.isEmpty(cmd)).collect(Collectors.toList());
             String cmd = commandList.remove(0);
             if (cmd.equalsIgnoreCase("info")) {
-                return jedis.getAllShards().stream().findAny().map(shard -> shard.clusterInfo()).get();
+                return jedis.getAllShards().stream().findAny().map(shard -> shard.info()).get();
             }
             if (cmd.equalsIgnoreCase("keys")) {
                 return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.keys(commandList.get(0)).stream()).collect(Collectors.toList()).toString();
