@@ -1038,16 +1038,16 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
         boolean isClusterFailOver = new IdempotentConfirmer() {
             @Override
             public boolean execute() {
-                String response = slaveJedis.clusterFailover();
-//                if (StringUtils.isBlank(failoverParam)) {
-//                    response = slaveJedis.clusterFailover();
-//                } else if ("force".equals(failoverParam)) {
-//                    response = slaveJedis.clusterFailoverForce();
-//                } else if ("takeover".equals(failoverParam)) {
-//                    response = slaveJedis.clusterFailoverTakeOver();
-//                } else {
-//                    logger.error("appId {} failoverParam {} is wrong", appId, failoverParam);
-//                }
+                String response = null;
+                if (StringUtils.isBlank(failoverParam)) {
+                    response = slaveJedis.clusterFailover();
+                } else if ("force".equals(failoverParam)) {
+                    response = slaveJedis.clusterFailoverForce();
+                } else if ("takeover".equals(failoverParam)) {
+                    response = slaveJedis.clusterFailoverTakeOver();
+                } else {
+                    logger.error("appId {} failoverParam {} is wrong", appId, failoverParam);
+                }
                 return response != null && response.equalsIgnoreCase("OK");
             }
         }.run();

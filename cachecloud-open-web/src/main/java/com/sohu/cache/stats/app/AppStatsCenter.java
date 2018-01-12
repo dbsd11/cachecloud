@@ -8,7 +8,6 @@ import com.sohu.cache.entity.AppStats;
 import com.sohu.cache.entity.InstanceSlowLog;
 import com.sohu.cache.web.vo.AppDetailVO;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -146,7 +145,7 @@ public interface AppStatsCenter {
      * @param command
      * @return
      */
-    public String executeCommand(long appId, String command) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException;
+    public String executeCommand(long appId, String command);
 
 
     /**

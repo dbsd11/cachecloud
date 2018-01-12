@@ -50,12 +50,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.util.Assert;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisCommands;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisShardInfo;
 import redis.clients.jedis.Protocol;
+import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ShardedJedis;
+import redis.clients.jedis.commands.JedisCommands;
 import redis.clients.jedis.exceptions.JedisAskDataException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisMovedDataException;
@@ -65,7 +66,6 @@ import redis.clients.util.SafeEncoder;
 import redis.clients.util.Slowlog;
 
 import java.lang.reflect.Array;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.sql.Timestamp;
 import java.util.*;
@@ -1029,7 +1029,7 @@ public class RedisCenterImpl implements RedisCenter {
     }
 
     @Override
-    public String executeCommand(AppDesc appDesc, String command) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException {
+    public String executeCommand(AppDesc appDesc, String command) {
         //非测试应用只能执行白名单里面的命令
         int type = appDesc.getType();
         long appId = appDesc.getAppId();
@@ -1961,9 +1961,22 @@ public class RedisCenterImpl implements RedisCenter {
             if (cmd.equalsIgnoreCase("info")) {
                 return jedis.getAllShards().stream().findAny().map(shard -> shard.info()).get();
             }
-//            if (cmd.equalsIgnoreCase("keys")) {
-//                return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.keys(commandList.get(0)).stream()).collect(Collectors.toList()).toString();
-//            }
+            if (cmd.equalsIgnoreCase("keys") && commandList.remove(0).equalsIgnoreCase("-f")) {
+                return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.keys(commandList.remove(0)).stream()).collect(Collectors.toList()).toString();
+            }
+            if (cmd.equalsIgnoreCase("scan")) {
+                String cursor = commandList.remove(0);
+                ScanParams scanParams = new ScanParams();
+                if (commandList.remove(0).equalsIgnoreCase("match")) {
+                    scanParams.match(commandList.remove(0));
+                    if (commandList.remove(0).equalsIgnoreCase("count")) {
+                        scanParams.count(Integer.valueOf(commandList.remove(0)));
+                    }
+                } else {
+                    scanParams.count(Integer.valueOf(commandList.remove(0)));
+                }
+                return jedis.getAllShards().stream().flatMap(jedisShard -> jedisShard.scan(cursor, scanParams).getResult().stream()).collect(Collectors.toList()).toString();
+            }
             for (Method method : JedisCommands.class.getMethods()) {
                 if (!cmd.equalsIgnoreCase(method.getName())) {
                     continue;

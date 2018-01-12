@@ -10,7 +10,6 @@ import com.sohu.cache.entity.InstanceSlowLog;
 import com.sohu.cache.web.vo.RedisSlowLog;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisSentinelPool;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Date;
@@ -188,7 +187,7 @@ public interface RedisCenter {
      * @param command
      * @return
      */
-    public String executeCommand(AppDesc appDesc, String command) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException;
+    public String executeCommand(AppDesc appDesc, String command);
 
     /**
      * 实例执行redis命令

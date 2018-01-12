@@ -205,6 +205,17 @@
                 <groupId>com.axhs</groupId>
                 <artifactId>tool-redis</artifactId>
                 <version>1.0-SNAPSHOT</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>redis.clients</groupId>
+                        <artifactId>jedis</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>com.sohu.tv</groupId>
+                <artifactId>cachecloud-jedis</artifactId>
+                <version>1.0-SNAPSHOT</version>
             </dependency>
 
         </dependencies>
