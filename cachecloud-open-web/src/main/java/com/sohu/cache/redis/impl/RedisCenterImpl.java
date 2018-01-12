@@ -1969,7 +1969,7 @@ public class RedisCenterImpl implements RedisCenter {
                 ScanParams scanParams = new ScanParams();
                 if (commandList.remove(0).equalsIgnoreCase("match")) {
                     scanParams.match(commandList.remove(0));
-                    if (commandList.remove(0).equalsIgnoreCase("count")) {
+                    if (commandList.size() > 0 && commandList.remove(0).equalsIgnoreCase("count")) {
                         scanParams.count(Integer.valueOf(commandList.remove(0)));
                     }
                 } else {
