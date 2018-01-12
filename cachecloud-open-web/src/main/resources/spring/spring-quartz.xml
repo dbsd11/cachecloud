@@ -105,7 +105,7 @@
         <property name="jobDetails">
             <array>
                 <ref bean="redisJobDetail"/>
-                <ref bean="machineJobDetail"/>
+                <!--<ref bean="machineJobDetail"/>-->
                 <ref bean="serverJobDetail"/>
                 <ref bean="machineMonitorJobDetail"/>
                 <ref bean="redisSlowLogJobDetail"/>
@@ -125,12 +125,12 @@
         <property name="durability" value="true"/>
     </bean>
 
-    <bean id="machineJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
-        <property name="name" value="machineJob"/>
-        <property name="group" value="machine"/>
-        <property name="jobClass" value="com.sohu.cache.schedule.jobs.MachineJob"/>
-        <property name="durability" value="true"/>
-    </bean>
+    <!--<bean id="machineJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">-->
+        <!--<property name="name" value="machineJob"/>-->
+        <!--<property name="group" value="machine"/>-->
+        <!--<property name="jobClass" value="com.sohu.cache.schedule.jobs.MachineJob"/>-->
+        <!--<property name="durability" value="true"/>-->
+    <!--</bean>-->
     <bean id="serverJobDetail" class="org.springframework.scheduling.quartz.JobDetailFactoryBean">
         <property name="name" value="serverJob"/>
         <property name="group" value="server"/>
