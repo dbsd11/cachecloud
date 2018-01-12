@@ -1,5 +1,6 @@
 package com.sohu.cache.redis.impl;
 
+import com.axhs.tool.redis.ShardedJedisSentinelPool;
 import com.sohu.cache.constant.ClusterOperateResult;
 import com.sohu.cache.constant.InstanceStatusEnum;
 import com.sohu.cache.dao.AppDao;
@@ -22,19 +23,21 @@ import com.sohu.cache.util.ConstUtils;
 import com.sohu.cache.util.IdempotentConfirmer;
 import com.sohu.cache.util.TypeUtil;
 import com.sohu.cache.web.enums.RedisOperateEnum;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.Assert;
-
 import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisSentinelPool;
 import redis.clients.jedis.Protocol;
+import redis.clients.jedis.ShardedJedis;
 import redis.clients.jedis.exceptions.JedisDataException;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,11 +55,11 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
     private RedisCenter redisCenter;
 
     private AppDao appDao;
-    
+
     private RedisConfigTemplateService redisConfigTemplateService;
-    
+
     private InstanceDeployCenter instanceDeployCenter;
-    
+
     @Override
     public boolean deployClusterInstance(long appId, List<RedisClusterNode> clusterNodes, int maxMemory) {
         if (!isExist(appId)) {
@@ -367,7 +370,7 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
     }
 
     private InstanceInfo saveInstance(long appId, String host, int port, int maxMemory, int type,
-            String cmd) {
+                                      String cmd) {
         InstanceInfo instanceInfo = new InstanceInfo();
         instanceInfo.setAppId(appId);
         MachineInfo machineInfo = machineDao.getMachineInfoByIp(host);
@@ -399,17 +402,17 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
     }
 
     private boolean runInstance(AppDesc appDesc, String host, Integer port, int maxMemory, boolean isCluster) {
-    		long appId = appDesc.getAppId();
-    		String password = appDesc.getPassword();
+        long appId = appDesc.getAppId();
+        String password = appDesc.getPassword();
         // 生成配置
         List<String> configs = handleCommonConfig(port, maxMemory);
         if (isCluster) {
             configs.addAll(handleClusterConfig(port));
         }
         if (StringUtils.isNotBlank(password)) {
-	        	//加两个选项
-	    		configs.add(RedisConfigEnum.REQUIREPASS.getKey() + ConstUtils.SPACE + password);
-	    		configs.add(RedisConfigEnum.MASTERAUTH.getKey() + ConstUtils.SPACE + password);
+            //加两个选项
+            configs.add(RedisConfigEnum.REQUIREPASS.getKey() + ConstUtils.SPACE + password);
+            configs.add(RedisConfigEnum.MASTERAUTH.getKey() + ConstUtils.SPACE + password);
         }
         printConfig(configs);
         String fileName;
@@ -452,8 +455,8 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
     }
 
     private boolean slaveOf(final long appId, final String masterHost, final int masterPort, final String slaveHost,
-            final int slavePort) {
-    		final Jedis slave = redisCenter.getJedis(appId, slaveHost, slavePort, Protocol.DEFAULT_TIMEOUT * 3, Protocol.DEFAULT_TIMEOUT * 3);
+                            final int slavePort) {
+        final Jedis slave = redisCenter.getJedis(appId, slaveHost, slavePort, Protocol.DEFAULT_TIMEOUT * 3, Protocol.DEFAULT_TIMEOUT * 3);
         try {
             boolean isSlave = new IdempotentConfirmer() {
                 @Override
@@ -479,10 +482,10 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
     }
 
     private boolean runSentinel(AppDesc appDesc, String sentinelHost, String masterName, String masterHost, Integer masterPort) {
-    		//应用信息
-    		long appId = appDesc.getAppId();
-    		String password = appDesc.getPassword();
-    	
+        //应用信息
+        long appId = appDesc.getAppId();
+        String password = appDesc.getPassword();
+
         //启动sentinel实例
         Integer sentinelPort = machineCenter.getAvailablePort(sentinelHost, ConstUtils.CACHE_REDIS_SENTINEL);
         if (sentinelPort == null) {
@@ -491,9 +494,9 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
         }
         List<String> masterSentinelConfigs = handleSentinelConfig(masterName, masterHost, masterPort, sentinelPort);
         if (StringUtils.isNotBlank(password)) {
-        		masterSentinelConfigs.add("sentinel " + RedisConfigEnum.AUTH_PASS.getKey() + ConstUtils.SPACE + masterName + ConstUtils.SPACE + password);
+            masterSentinelConfigs.add("sentinel " + RedisConfigEnum.AUTH_PASS.getKey() + ConstUtils.SPACE + masterName + ConstUtils.SPACE + password);
         }
-        
+
         printConfig(masterSentinelConfigs);
         String masterSentinelFileName = RedisProtocol.getConfig(sentinelPort, false);
         String sentinelPathFile = machineCenter
@@ -656,8 +659,8 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
     @Override
     public boolean addSentinel(long appId, String sentinelHost) {
         AppDesc appDesc = appDao.getAppDescById(appId);
-        JedisSentinelPool jedisSentinelPool = redisCenter.getJedisSentinelPool(appDesc);
-        if (jedisSentinelPool == null) {
+        ShardedJedisSentinelPool pool = redisCenter.getShardedJedisSentinelPool(appDesc);
+        if (pool == null) {
             return false;
         }
         List<InstanceInfo> instanceInfos = instanceDao.getInstListByAppId(appId);
@@ -672,18 +675,16 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
                 masterName = instanceInfo.getCmd();
             }
         }
-        Jedis jedis = null;
         String masterHost = null;
         Integer masterPort = null;
-        try {
-            jedis = jedisSentinelPool.getResource();
+        try (ShardedJedis shardedJedis = pool.getResource()) {
+            Jedis jedis = shardedJedis.getAllShards().stream().findFirst().get();
             masterHost = jedis.getClient().getHost();
             masterPort = jedis.getClient().getPort();
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         } finally {
-            jedis.close();
-            jedisSentinelPool.destroy();
+            pool.destroy();
         }
         boolean isRun = runSentinel(appDesc, sentinelHost, masterName, masterHost, masterPort);
         if (!isRun) {
@@ -691,9 +692,9 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
         }
         return true;
     }
-    
+
     @Override
-    public RedisOperateEnum addSlotsFailMaster(final long appId, int lossSlotsInstanceId,final String newMasterHost) throws Exception {
+    public RedisOperateEnum addSlotsFailMaster(final long appId, int lossSlotsInstanceId, final String newMasterHost) throws Exception {
         // 1.参数、应用、实例信息确认
         Assert.isTrue(appId > 0);
         Assert.isTrue(lossSlotsInstanceId > 0);
@@ -755,7 +756,7 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
             logger.error("{}:{} copy config {}:{} is error", healthyMasterHost, healthyMasterPort, newMasterHost, newMasterPort);
             return RedisOperateEnum.FAIL;
         }
-        
+
         // 5. meet
         boolean isClusterMeet = false;
         Jedis sourceMasterJedis = null;
@@ -777,7 +778,7 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
             logger.warn("{}:{} meet {}:{} is fail", healthyMasterHost, healthyMasterPort, newMasterHost, newMasterPort);
             return RedisOperateEnum.FAIL;
         }
-        
+
         // 6. 分配slots
         //String addSlotsResult = "";
         Jedis newMasterJedis = null;
@@ -843,19 +844,19 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
             logger.warn("{}:{} set slots faily", newMasterHost, newMasterPort);
             return RedisOperateEnum.FAIL;
         }*/
-        
+
         // 7.保存实例信息、并开启收集信息
         saveInstance(appId, newMasterHost, newMasterPort, healthyMasterMem, ConstUtils.CACHE_TYPE_REDIS_CLUSTER, "");
         redisCenter.deployRedisCollection(appId, newMasterHost, newMasterPort);
-        
+
         // 休息一段时间，同步clusterNodes信息
         TimeUnit.SECONDS.sleep(2);
-        
+
         // 8.最终打印出当前还没有补充的slots
         List<Integer> currentLossSlots = redisCenter.getClusterLossSlots(appId, newMasterHost, newMasterPort);
         logger.warn("appId {} failslots assigned unsuccessfully, lossslots is {}", appId, currentLossSlots);
-        
-        return RedisOperateEnum.OP_SUCCESS;        
+
+        return RedisOperateEnum.OP_SUCCESS;
     }
 
     @Override
@@ -996,7 +997,7 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
                 boolean isSentinelFailOver = new IdempotentConfirmer() {
                     @Override
                     public boolean execute() {
-                    	
+
                         Jedis jedis = redisCenter.getJedis(host, port);
                         try {
                             String response = jedis.sentinelFailover(masterName);
@@ -1058,7 +1059,7 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
         }
         return true;
     }
-    
+
     @Override
     public ClusterOperateResult delNode(final Long appId, int delNodeInstanceId) {
         final InstanceInfo forgetInstanceInfo = instanceDao.getInstanceInfoById(delNodeInstanceId);
@@ -1110,21 +1111,21 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
                 return ClusterOperateResult.fail(String.format("%s:%s forget %s failed", instanceHost, instancePort, forgetNodeId));
             }
         }
-        
+
         // shutdown
         boolean isShutdown = instanceDeployCenter.shutdownExistInstance(appId, delNodeInstanceId);
         if (!isShutdown) {
             logger.warn("{} shutdown failed", forgetInstanceInfo.getHostPort());
             return ClusterOperateResult.fail(String.format("%s shutdown failed", forgetInstanceInfo.getHostPort()));
         }
-        
+
         return ClusterOperateResult.success();
     }
-    
-    
+
+
     /**
-     * 1. 被forget的节点必须在线(这个条件有待验证) 
-     * 2. 被forget的节点不能有从节点 
+     * 1. 被forget的节点必须在线(这个条件有待验证)
+     * 2. 被forget的节点不能有从节点
      * 3. 被forget的节点不能有slots
      */
     @Override
@@ -1178,7 +1179,7 @@ public class RedisDeployCenterImpl implements RedisDeployCenter {
      * @return
      */
     private boolean copyCommonConfig(long appId, String sourceHost, int sourcePort, String targetHost, int targetPort) {
-        String[] compareConfigs = new String[] {"maxmemory-policy", "maxmemory", "cluster-node-timeout",
+        String[] compareConfigs = new String[]{"maxmemory-policy", "maxmemory", "cluster-node-timeout",
                 "cluster-require-full-coverage", "repl-backlog-size", "appendonly", "hash-max-ziplist-entries",
                 "hash-max-ziplist-value", "list-max-ziplist-entries", "list-max-ziplist-value", "set-max-intset-entries",
                 "zset-max-ziplist-entries", "zset-max-ziplist-value", "timeout", "tcp-keepalive"};

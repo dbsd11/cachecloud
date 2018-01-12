@@ -53,7 +53,6 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCommands;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisSentinelPool;
 import redis.clients.jedis.Protocol;
 import redis.clients.jedis.ShardedJedis;
 import redis.clients.jedis.exceptions.JedisAskDataException;
@@ -1035,9 +1034,7 @@ public class RedisCenterImpl implements RedisCenter {
         long appId = appDesc.getAppId();
         String password = appDesc.getPassword();
         if (type == ConstUtils.CACHE_REDIS_SENTINEL) {
-            Set<String> sentinelHosts = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getHostPort()).collect(Collectors.toSet());
-            List<String> masters = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getCmd()).collect(Collectors.toList());
-            ShardedJedisSentinelPool pool = new ShardedJedisSentinelPool(new JedisPoolConfig(), masters, sentinelHosts);
+            ShardedJedisSentinelPool pool = getShardedJedisSentinelPool(appDesc);
             try (ShardedJedis jedis = pool.getResource()) {
                 List<String> commandList = Arrays.asList(command.split(" ")).stream().filter(cmd -> !StringUtils.isEmpty(cmd)).collect(Collectors.toList());
                 String cmd = commandList.remove(0);
@@ -1056,7 +1053,7 @@ public class RedisCenterImpl implements RedisCenter {
                     List<Object> paramList = new LinkedList<>();
                     for (Class paramType : method.getParameterTypes()) {
                         if (paramType.isArray()) {
-                            paramList.add(commandList.toArray((Object[])Array.newInstance(paramType.getComponentType(), 0)));
+                            paramList.add(commandList.toArray((Object[]) Array.newInstance(paramType.getComponentType(), 0)));
                             break;
                         }
                         if (!paramType.isPrimitive()) {
@@ -1191,35 +1188,11 @@ public class RedisCenterImpl implements RedisCenter {
     }
 
     @Override
-    public JedisSentinelPool getJedisSentinelPool(AppDesc appDesc) {
-        if (appDesc == null) {
-            logger.error("appDesc is null");
-            return null;
-        }
-        if (appDesc.getType() != ConstUtils.CACHE_REDIS_SENTINEL) {
-            logger.error("type={} is not sentinel", appDesc.getType());
-            return null;
-        }
-        long appId = appDesc.getAppId();
-        List<InstanceInfo> instanceInfos = instanceDao.getInstListByAppId(appId);
-
-        String masterName = null;
-        for (Iterator<InstanceInfo> i = instanceInfos.iterator(); i.hasNext(); ) {
-            InstanceInfo instanceInfo = i.next();
-            if (instanceInfo.getType() != ConstUtils.CACHE_REDIS_SENTINEL) {
-                i.remove();
-                continue;
-            }
-            if (masterName == null && StringUtils.isNotBlank(instanceInfo.getCmd())) {
-                masterName = instanceInfo.getCmd();
-            }
-        }
-        Set<String> sentinels = new HashSet<String>();
-        for (InstanceInfo instanceInfo : instanceInfos) {
-            sentinels.add(instanceInfo.getIp() + ":" + instanceInfo.getPort());
-        }
-        JedisSentinelPool jedisSentinelPool = new JedisSentinelPool(masterName, sentinels);
-        return jedisSentinelPool;
+    public ShardedJedisSentinelPool getShardedJedisSentinelPool(AppDesc appDesc) {
+        Set<String> sentinelHosts = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getHostPort()).collect(Collectors.toSet());
+        List<String> masters = instanceDao.getInstListByAppId(appDesc.getAppId()).stream().map(instanceInfo -> instanceInfo.getCmd()).collect(Collectors.toList());
+        ShardedJedisSentinelPool pool = new ShardedJedisSentinelPool(new JedisPoolConfig(), masters, sentinelHosts);
+        return pool;
     }
 
     @Override
@@ -2024,31 +1997,5 @@ public class RedisCenterImpl implements RedisCenter {
     @Override
     public Jedis getJedis(String host, int port) {
         return getJedis(host, port, null);
-    }
-
-
-    public static final String CHAR_PATTERN = "[^0-9]";
-    public static final String INT_PATTERN = "^-?[1-9]\\d*$";
-    public static final String DOUBLE_PATTERN = "^[-]?[1-9]\\d*\\.\\d*|-0\\.\\d*[1-9]\\d*$";
-
-    public static Object convert(String item) {
-        // 忽略所有空字符串或全是空格的字符串
-        if (StringUtils.isEmpty(item)) {
-            return null;
-        }
-        item = item.trim();
-        if ("true".equalsIgnoreCase(item) || "false".equalsIgnoreCase(item)) {
-            return Boolean.valueOf(item);
-        }
-        if (item.matches(CHAR_PATTERN)) {
-            return Character.toString(item.charAt(0));
-        }
-        if (item.matches(INT_PATTERN)) {
-            return Integer.valueOf(item);
-        }
-        if (item.matches(DOUBLE_PATTERN)) {
-            return Double.valueOf(item);
-        }
-        return item;
     }
 }
