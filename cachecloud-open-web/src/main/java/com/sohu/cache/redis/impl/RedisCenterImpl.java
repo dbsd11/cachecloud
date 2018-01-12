@@ -1138,10 +1138,8 @@ public class RedisCenterImpl implements RedisCenter {
         }
 
         try (ShardedJedis shardedJedis = new ShardedJedis(Collections.singletonList(new JedisShardInfo(host, port)))) {
-            callCommand(shardedJedis, command);
+            return callCommand(shardedJedis, command);
         }
-
-        throw new RuntimeException("not allowd ssh command");
     }
 
     @Override
