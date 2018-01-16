@@ -222,13 +222,13 @@ public class JedisSentinelPool extends JedisPoolAbstract {
     }
   }
 
-  protected void returnBrokenResource(final Jedis resource) {
+  public void returnBrokenResource(final Jedis resource) {
     if (resource != null) {
       returnBrokenResourceObject(resource);
     }
   }
 
-  protected void returnResource(final Jedis resource) {
+  public void returnResource(final Jedis resource) {
     if (resource != null) {
       resource.resetState();
       returnResourceObject(resource);
